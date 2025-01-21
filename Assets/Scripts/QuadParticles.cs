@@ -18,6 +18,16 @@ public class QuadParticles : MonoBehaviour
     }
 
     const int SIZE_PARTICLE = 7 * sizeof(float);
+    
+    // struct
+    struct Vertex
+    {
+        public Vector3 position;
+        public Vector2 uv;
+        public float life;
+    }
+    const int SIZE_VERTEX = 6 * sizeof(float);
+    // public float quadSize = 0.1f; // Quad的尺寸
 
     public int particleCount = 10000;
     public Material material;
@@ -29,6 +39,7 @@ public class QuadParticles : MonoBehaviour
     int numVerticesInMesh;
     int kernelID;
     ComputeBuffer particleBuffer;
+    ComputeBuffer vertexBuffer;
     
     int groupSizeX; 
     
@@ -38,6 +49,45 @@ public class QuadParticles : MonoBehaviour
         Init();
     }
 
+    // void Init()
+    // {
+    //     // find the id of the kernel
+    //     kernelID = shader.FindKernel("CSMain");
+    //
+    //     uint threadsX;
+    //     shader.GetKernelThreadGroupSizes(kernelID, out threadsX, out _, out _);
+    //     groupSizeX = Mathf.CeilToInt((float)particleCount / (float)threadsX);
+    //     numParticles = groupSizeX * (int)threadsX;
+    //
+    //     // initialize the particles
+    //     Particle[] particleArray = new Particle[numParticles];
+    //
+    //     int numVertices = numParticles * 6;
+    //     
+    //     Vector3 pos = new Vector3();
+    //     
+    //     for (int i = 0; i < numParticles; i++)
+    //     {
+    //         pos.Set(Random.value * 2 - 1.0f, Random.value * 2 - 1.0f, Random.value * 2 - 1.0f);
+    //         pos.Normalize();
+    //         pos *= Random.value;
+    //         pos *= 0.5f;
+    //
+    //         particleArray[i].position.Set(pos.x, pos.y, pos.z + 3);
+    //         particleArray[i].velocity.Set(0,0,0);
+    //       
+    //         // Initial life value
+    //         particleArray[i].life = Random.value * 5.0f + 1.0f;
+    //     }
+    //
+    //     // create compute buffers
+    //     particleBuffer = new ComputeBuffer(numParticles, SIZE_PARTICLE);
+    //     particleBuffer.SetData(particleArray);
+    //     
+    //     // bind the compute buffers to the shader and the compute shader
+    //     shader.SetBuffer(kernelID, "particleBuffer", particleBuffer);
+    // }
+    
     void Init()
     {
         // find the id of the kernel
@@ -49,44 +99,44 @@ public class QuadParticles : MonoBehaviour
         numParticles = groupSizeX * (int)threadsX;
 
         // initialize the particles
-        Particle[] particleArray = new Particle[numParticles];
+        // Particle[] particleArray = new Particle[numParticles];
+        
 
         int numVertices = numParticles * 6;
+        Vertex[] vertexArray = new Vertex[numVertices];
         
-        Vector3 pos = new Vector3();
-        
+        // Vector3 pos = new Vector3();
+        int index = 0;
         for (int i = 0; i < numParticles; i++)
         {
-            pos.Set(Random.value * 2 - 1.0f, Random.value * 2 - 1.0f, Random.value * 2 - 1.0f);
-            pos.Normalize();
-            pos *= Random.value;
-            pos *= 0.5f;
-
-            particleArray[i].position.Set(pos.x, pos.y, pos.z + 3);
-            particleArray[i].velocity.Set(0,0,0);
-          
-            // Initial life value
-            particleArray[i].life = Random.value * 5.0f + 1.0f;
+            index = i * 6;
+            //Triangle 1 - bottom-left, top-left, top-right
+            vertexArray[index].uv.Set(0,0);
+            vertexArray[index+1].uv.Set(0,1);
+            vertexArray[index+2].uv.Set(1,1);
+            //Triangle 2 - bottom-left, top-right, bottom-right
+            vertexArray[index+3].uv.Set(0,0);
+            vertexArray[index+4].uv.Set(1,1);
+            vertexArray[index+5].uv.Set(1,0);
         }
 
-        // create compute buffers
-        particleBuffer = new ComputeBuffer(numParticles, SIZE_PARTICLE);
-        particleBuffer.SetData(particleArray);
-        
-        // bind the compute buffers to the shader and the compute shader
-        shader.SetBuffer(kernelID, "particleBuffer", particleBuffer);
+        vertexBuffer = new ComputeBuffer(numVertices, SIZE_VERTEX);
+        vertexBuffer.SetData(vertexArray);
+        shader.SetBuffer(kernelID, "vertexBuffer", vertexBuffer);
+        shader.SetFloat("halfSize", quadSize*0.5f);
+        material.SetBuffer("vertexBuffer", vertexBuffer);
     }
 
     void OnRenderObject()
     {
         material.SetPass(0);
-        Graphics.DrawProceduralNow(MeshTopology.Points, 1, numParticles);
+        Graphics.DrawProceduralNow(MeshTopology.Triangles, 6, numParticles);
     }
 
     void OnDestroy()
     {
-        if (particleBuffer != null){
-            particleBuffer.Release();
+        if (vertexBuffer != null){
+            vertexBuffer.Release();
         }
     }
 
