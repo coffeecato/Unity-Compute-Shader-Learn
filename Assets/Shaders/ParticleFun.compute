@@ -1,7 +1,14 @@
 ﻿#pragma kernel CSParticle
-
-
-// Variables set from the CPU 
+// 定义粒子数据结构
+struct Particle
+{
+	float3 position;  // 粒子的位置
+	float3 velocity;  // 粒子的速度
+	float life;       // 粒子的剩余生命时间
+};
+// 用于存储和更新粒子数据的结构化缓冲区，可从GPU读写
+RWStructuredBuffer<Particle> particleBuffer;
+// 从CPU设置的变量
 float deltaTime;
 float2 mousePosition;
 
@@ -25,14 +32,28 @@ void respawn(uint id)
 	float f2 = float(rand_xorshift()) * tmp - 0.5;
 	float3 normalF3 = normalize(float3(f0, f1, f2)) * 0.8f;
 	normalF3 *= float(rand_xorshift()) * tmp;
-	/*particleBuffer[id].position = float3(normalF3.x + mousePosition.x, normalF3.y + mousePosition.y, normalF3.z + 3.0);
-	// reset the life of this particle
-	particleBuffer[id].life = 4;
-	particleBuffer[id].velocity = float3(0,0,0);*/
+	particleBuffer[id].position = float3(normalF3.x + mousePosition.x, normalF3.y + mousePosition.y, normalF3.z + 3.0);
+	particleBuffer[id].life = 4;					// reset the life of this particle
+	particleBuffer[id].velocity = float3(0,0,0);
 }
 
 [numthreads(256, 1, 1)]
 void CSParticle(uint3 id : SV_DispatchThreadID)
 {
-	
+	Particle p = particleBuffer[id.x];
+	p.life -= deltaTime;
+
+	float3 delta = float3(mousePosition.xy, 3) - p.position;
+	float3 dir = normalize(delta);
+
+	p.velocity += dir;
+	p.position += p.velocity * deltaTime;
+
+	particleBuffer[id.x] = p;
+
+	if (particleBuffer[id.x].life < 0)
+	{
+		respawn(id.x);
+		p = particleBuffer[id.x];
+	}
 }
